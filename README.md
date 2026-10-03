@@ -6,7 +6,7 @@ when running alongside **Abacayba: Infested Death Twin of Nauvis**.
 
 ## The problem
 
-Abacayba applies a bonus melee damage type (`itaverax`) to *all*
+Abacayba applies a bonus melee damage type (`itaverax`) to _all_
 `SegmentedUnitPrototype` entities in the game, not just its own new content.
 Vanilla demolisher resistances were authored before the `itaverax` damage
 type existed, so they have no resistance entry for it and take full,
@@ -45,6 +45,7 @@ install it directly through the in-game mod portal.
 ## Development / release process
 
 Branches:
+
 - `dev` -- active development
 - `staging` -- testing
 - `master` -- production; pushing here triggers the release pipeline
@@ -57,6 +58,7 @@ anything. The built zip is attached as a workflow artifact for inspection.
 ### Release (`master`) -- automatic
 
 On every push to `master`:
+
 1. Bumps the version in `info.json` (`Major.Minor.Release`). Defaults to
    bumping `Release`; include `[minor]` or `[major]` in the triggering
    commit message to bump one of those instead (resets the numbers to the
@@ -81,20 +83,3 @@ That workflow downloads the chosen release's zip and publishes it to the
 Factorio Mod Portal via the official
 [Mod Upload API](https://wiki.factorio.com/Mod_upload_API). Nothing ever
 reaches the live mod portal without this manual step.
-
-### One-time setup required
-
-- **First publish must be manual.** The Mod Upload API only supports
-  adding releases to a mod that already exists on the portal -- it can't
-  create the initial listing. Submit the mod once yourself via the
-  "Submit mod" button on your factorio.com profile before the pipeline's
-  mod-portal publish step will work.
-- **`FACTORIO_API_KEY` secret.** Generate an API key at
-  factorio.com/profile and add it as a repository secret
-  (Settings → Secrets and variables → Actions) named `FACTORIO_API_KEY`.
-  If this secret isn't set, the release workflow still creates the
-  GitHub Release and zip, it just skips the mod-portal publish step.
-- The `publish_mod_portal.sh` script hasn't been exhaustively verified
-  against the live API -- if it errors on first use, check the printed
-  response body for the actual field names expected and adjust the script
-  accordingly.
