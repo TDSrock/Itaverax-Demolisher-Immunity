@@ -10,7 +10,7 @@ jobs:
   validate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Validate info.json
         run: |
@@ -23,7 +23,7 @@ jobs:
           scripts/package_mod.sh
 
       - name: Upload build artifact for inspection
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: mod-zip-preview
           path: "*.zip"
