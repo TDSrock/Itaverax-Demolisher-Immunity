@@ -1,6 +1,6 @@
 {
   "name": "itaverax-demolisher-immunity",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "title": "Itaverax Segmented Unit Immunity",
   "author": "TDSrock",
   "description": "Grants full itaverax damage resistance to all segmented-unit and segment prototypes, preventing demolishers (and other segmented enemies) from self-destructing due to Abacayba's itaverax melee damage bonus. This is a temporary stopgap until Abacayba itself ships a fix.",
