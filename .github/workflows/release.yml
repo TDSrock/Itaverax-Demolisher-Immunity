@@ -1,0 +1,65 @@
+name: Release
+
+on:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Default bump is "release" (the 3rd number in Major.Minor.Release).
+      # Include "[major]" or "[minor]" anywhere in the commit message that
+      # triggers this workflow to bump one of those instead.
+      - name: Determine bump type
+        id: bump_type
+        run: |
+          MSG="${{ github.event.head_commit.message }}"
+          if [[ "$MSG" == *"[major]"* ]]; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif [[ "$MSG" == *"[minor]"* ]]; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=release" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump version
+        id: version
+        run: |
+          chmod +x scripts/bump_version.sh
+          scripts/bump_version.sh "${{ steps.bump_type.outputs.type }}" >> "$GITHUB_OUTPUT"
+
+      - name: Commit version bump and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add info.json
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
+          git tag "v${{ steps.version.outputs.new_version }}"
+          git push origin master
+          git push origin "v${{ steps.version.outputs.new_version }}"
+
+      - name: Package mod
+        id: package
+        run: |
+          chmod +x scripts/package_mod.sh
+          scripts/package_mod.sh >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.version.outputs.new_version }}"
+          name: "v${{ steps.version.outputs.new_version }}"
+          files: "${{ steps.package.outputs.zip_name }}"
+
+      # Mod portal publishing is intentionally NOT automatic here.
+      # Use the "Publish to Mod Portal" workflow (Actions tab -> Run workflow)
+      # once you're ready to actually push this release live.
