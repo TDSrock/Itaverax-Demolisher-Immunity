@@ -1,0 +1,5 @@
+---------------------------------------------------------------------------------------------------
+Version: 0.0.1
+Date: 17. 10. 2026
+  Features:
+    - Grants full itaverax damage resistance to every segmented-unit and segment prototype, so demolishers (and other segmented enemies) no longer destroy themselves with Abacayba's itaverax melee damage. An existing itaverax resistance entry is never overridden.

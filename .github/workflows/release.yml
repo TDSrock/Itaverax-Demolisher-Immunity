@@ -1,14 +1,34 @@
 name: Release
 
+# Manual only: nothing is released unless you click "Run workflow" in the Actions tab.
+# Run it from master.
+#
+# A "version" here is a tag + GitHub Release. Not every version has to reach the mod portal:
+# tick "internal" for versions you keep to yourself. Those are marked as pre-release, and the
+# "Publish to Mod Portal" workflow skips pre-releases when it picks the latest release.
+#
+# The changelog is built from the "Changelog:" sections of the pull requests merged since the last
+# release (see scripts/changelog.py). The date is filled in automatically.
 on:
-  push:
-    branches: [master]
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Which version number to bump (Major.Minor.Release)'
+        type: choice
+        options: [release, minor, major]
+        default: release
+      internal:
+        description: 'Internal version: mark the GitHub Release as a pre-release (not picked by default for the mod portal)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -16,32 +36,52 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Default bump is "release" (the 3rd number in Major.Minor.Release).
-      # Include "[major]" or "[minor]" anywhere in the commit message that
-      # triggers this workflow to bump one of those instead.
-      - name: Determine bump type
-        id: bump_type
+      # Guard against a double click: releasing twice without changes in between.
+      - name: Ensure there is something to release
         run: |
-          MSG="${{ github.event.head_commit.message }}"
-          if [[ "$MSG" == *"[major]"* ]]; then
-            echo "type=major" >> "$GITHUB_OUTPUT"
-          elif [[ "$MSG" == *"[minor]"* ]]; then
-            echo "type=minor" >> "$GITHUB_OUTPUT"
-          else
-            echo "type=release" >> "$GITHUB_OUTPUT"
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [[ -n "$PREV" && "$(git rev-list --count "${PREV}..HEAD")" -eq 0 ]]; then
+            echo "::error::No commits since ${PREV}; nothing to release."
+            exit 1
           fi
 
       - name: Bump version
         id: version
+        env:
+          BUMP: ${{ inputs.bump }}
         run: |
           chmod +x scripts/bump_version.sh
-          scripts/bump_version.sh "${{ steps.bump_type.outputs.type }}" >> "$GITHUB_OUTPUT"
+          scripts/bump_version.sh "$BUMP" >> "$GITHUB_OUTPUT"
+
+      # Collects the Changelog sections of the merged PRs and writes the new version section in the
+      # official format. A section for this version that is already at the top of changelog.txt
+      # (written by hand) is kept as it is. Nothing is committed or tagged if this fails.
+      - name: Generate changelog from pull requests
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          OUT=$(python3 scripts/changelog.py release --version "${{ steps.version.outputs.new_version }}" --repo "${{ github.repository }}" --write 2>&1)
+          RC=$?
+          echo "$OUT"
+          # Pull requests without a Changelog section are listed as warnings in the output.
+          while IFS= read -r line; do
+            if [[ "$line" == WARNING:* ]]; then echo "::warning title=Changelog::${line#WARNING: }"; fi
+          done <<< "$OUT"
+          if [[ $RC -ne 0 ]]; then
+            echo "::error title=Changelog::The changelog could not be generated (exit code ${RC}); see the log. Nothing was released."
+            exit 1
+          fi
+
+      - name: Check changelog format
+        run: python3 scripts/changelog.py validate --expect-version "${{ steps.version.outputs.new_version }}"
 
       - name: Commit version bump and tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add info.json
+          if [[ -f changelog.txt ]]; then git add changelog.txt; fi
           git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }} [skip ci]"
           git tag "v${{ steps.version.outputs.new_version }}"
           git push origin master
@@ -53,13 +93,18 @@ jobs:
           chmod +x scripts/package_mod.sh
           scripts/package_mod.sh >> "$GITHUB_OUTPUT"
 
+      - name: Release notes from the changelog
+        run: python3 scripts/changelog.py notes --version "${{ steps.version.outputs.new_version }}" > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           tag_name: "v${{ steps.version.outputs.new_version }}"
           name: "v${{ steps.version.outputs.new_version }}"
+          body_path: release-notes.md
+          prerelease: ${{ inputs.internal }}
           files: "${{ steps.package.outputs.zip_name }}"
 
       # Mod portal publishing is intentionally NOT automatic here.
       # Use the "Publish to Mod Portal" workflow (Actions tab -> Run workflow)
-      # once you're ready to actually push this release live.
+      # once you're ready to actually push a release live.

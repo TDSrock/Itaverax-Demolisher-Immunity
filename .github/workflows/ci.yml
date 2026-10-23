@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [dev, staging]
+    branches: [master]
   pull_request:
-    branches: [dev, staging, master]
+    branches: [master]
 
 jobs:
   validate:
@@ -16,6 +16,9 @@ jobs:
         run: |
           jq empty info.json
           echo "info.json is valid JSON"
+
+      - name: Validate changelog.txt against the official format
+        run: python3 scripts/changelog.py validate
 
       - name: Dry-run package (does not publish anything)
         run: |
